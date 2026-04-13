@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiveChrome</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #0d0f14;
+      --bg-secondary: #161920;
+      --bg-card: #1c1f28;
+      --bg-hover: #22263a;
+      --border: #2a2e3d;
+      --border-light: #333849;
+      --text-primary: #f0f2f8;
+      --text-secondary: #8b90a8;
+      --text-muted: #555b72;
+      --accent: #5b5ef4;
+      --accent-dim: #3d3f9e;
+      --green: #22c55e;
+      --green-dim: #14532d;
+      --yellow: #eab308;
+      --yellow-dim: #713f12;
+      --red: #ef4444;
+      --red-dim: #7f1d1d;
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+
+    html, body {
+      width: 420px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* ─── Header ─────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-secondary);
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #5b5ef4, #9333ea);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .brand-name {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      background: linear-gradient(90deg, #f0f2f8, #9ba3c8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .status-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    /* ─── Body ────────────────────────────────── */
+    .body {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ─── Section label ───────────────────────── */
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    /* ─── State cards ─────────────────────────── */
+    .state-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 16px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .state-icon { font-size: 28px; opacity: 0.6; }
+    .state-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .state-sub { font-size: 12px; color: var(--text-secondary); }
+
+    /* ─── Creator section ─────────────────────── */
+    #creator-section {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      animation: fadeSlideIn 0.3s ease both;
+    }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── Handle card ─────────────────────────── */
+    .handle-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .creator-handle {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.3px;
+    }
+
+    .platform-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      flex-shrink: 0;
+    }
+
+    .platform-badge.tiktok {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-light);
+    }
+
+    .platform-badge.instagram {
+      background: rgba(168, 85, 247, 0.12);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.25);
+    }
+
+    /* ─── Sheet selector ──────────────────────── */
+    .sheet-select {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 34px 10px 12px;
+      color: var(--text-primary);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b90a8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      transition: border-color 0.2s;
+    }
+
+    .sheet-select:focus { border-color: var(--accent); }
+    .sheet-select option { background: var(--bg-card); color: var(--text-primary); }
+
+    /* ─── Save button ─────────────────────────── */
+    .save-btn {
+      width: 100%;
+      padding: 11px 16px;
+      background: linear-gradient(135deg, #5b5ef4, #7c3aed);
+      border: none;
+      border-radius: var(--radius);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.2px;
+      transition: opacity 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .save-btn:hover { opacity: 0.88; }
+    .save-btn:active { transform: scale(0.98); }
+    .save-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .save-btn.saved {
+      background: linear-gradient(135deg, #16a34a, #15803d);
+    }
+
+    .save-btn.save-error {
+      background: linear-gradient(135deg, #b45309, #92400e);
+    }
+
+    .btn-spinner {
+      display: inline-block;
+      width: 13px;
+      height: 13px;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    body::-webkit-scrollbar { width: 0; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-brand">
+      <div class="logo-dot">⚡</div>
+      <span class="brand-name">LiveChrome</span>
+    </div>
+    <div class="header-meta">
+      <div class="status-dot"></div>
+      <span class="status-label">Live</span>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="body">
+
+    <!-- Loading state -->
+    <div id="loading-state" class="state-card">
+      <div class="state-icon">🔍</div>
+      <div class="state-title">Detecting creator…</div>
+      <div class="state-sub">Navigate to a TikTok or Instagram profile page</div>
+    </div>
+
+    <!-- Not found state -->
+    <div id="notfound-state" class="state-card" style="display:none;">
+      <div class="state-icon">👤</div>
+      <div class="state-title">No creator detected</div>
+      <div class="state-sub">Navigate to a TikTok or Instagram profile page</div>
+    </div>
+
+    <!-- Locked state -->
+    <div id="locked-state" class="state-card" style="display:none;">
+      <div class="state-icon">🔒</div>
+      <div class="state-title">No active subscription</div>
+      <div class="state-sub">Get access at livechrome.com to use this extension.</div>
+      <a
+        href="https://livechrome.com"
+        target="_blank"
+        style="margin-top:12px; display:inline-block; padding:8px 16px; background:#5b5ef4; color:#fff; border-radius:8px; font-size:12px; font-weight:600; text-decoration:none;"
+      >
+        Get access
+      </a>
+    </div>
+
+    <!-- Creator section -->
+    <div id="creator-section">
+
+      <!-- Part 1: Detected handle -->
+      <div>
+        <div class="section-label">Detected Creator</div>
+        <div class="handle-card">
+          <div class="creator-handle" id="c-handle">—</div>
+          <span class="platform-badge" id="c-platform"></span>
+        </div>
+      </div>
+
+      <!-- Part 2: Sheet selector -->
+      <div>
+        <div class="section-label">Save to Sheet</div>
+        <select class="sheet-select" id="sheet-select">
+          <option value="My Creator Sheet">My Creator Sheet</option>
+          <option value="Client Campaign Sheet">Client Campaign Sheet</option>
+        </select>
+      </div>
+
+      <!-- Part 3: Save button -->
+      <button class="save-btn" id="save-btn">Save to Sheet</button>
+
+    </div>
+
+  </div>
+
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

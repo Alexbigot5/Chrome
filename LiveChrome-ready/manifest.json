@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "LiveChrome \u2014 Creator Intelligence",
+  "version": "1.1.0",
+  "description": "Instantly surface TikTok & Instagram creator stats and match scores while browsing.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "identity"
+  ],
+  "oauth2": {
+    "client_id": "985936531089-dldqv4thrguoluvcu6ci9lcpqmam347p.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email"
+    ]
+  },
+  "host_permissions": [
+    "https://www.tiktok.com/*",
+    "https://tiktok.com/*",
+    "https://www.instagram.com/*",
+    "https://instagram.com/*",
+    "https://*.up.railway.app/*",
+    "https://www.googleapis.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.tiktok.com/*",
+        "https://tiktok.com/*",
+        "https://www.instagram.com/*",
+        "https://instagram.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAthoJBetMCrJYHRWnpdEhV8FLxKy4xqeAMZsEAO/uq/0r+avD9KoBcq8u6SMglhcLSXAEoikz6f1fH7i0J1eD2G+AGUcYQHDuF3nR2gY6gTHTGRaCNgUqwJ5Se2e97VIhJyl8g1x4OTo82kk1UQ2WPuOWt0xNx7P5u1o77ms14qISArZJrp466ijDMR8YH3wsXoAn8itMyTZY7GuiZ1q2ykrGrjyzalR8ltXKJuFFOlpa0j0DUFb7uuqVyn9T/gZvV5mzyZ0eivxKt4Krmqwe/5W1RE6qWjCSLQq+ikfL+Ohm+ueQ/91cGgi+n8IQZ+uhisHpekU2dzFOOCfF1Aj7/wIDAQAB"
+}
