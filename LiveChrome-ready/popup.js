@@ -37,7 +37,7 @@ function showCreator() {
   creatorSection.style.display = 'flex';
 }
 
-// ─── Auth: get Google token (not just email) ───────────────────────────────
+// ─── Auth: get Google token ────────────────────────────────────────────────
 async function getGoogleToken() {
   return new Promise((resolve, reject) => {
     chrome.identity.getAuthToken({ interactive: true }, (token) => {
@@ -63,7 +63,6 @@ function detectHandle(url) {
   const tiktokMatch = url.match(/tiktok\.com\/@([\w.]+)/);
   if (tiktokMatch) return { handle: tiktokMatch[1], platform: 'tiktok' };
 
-  // Instagram: match /@handle and /handle, but exclude non-profile paths
   const igExclude = /instagram\.com\/(explore|reels|stories|accounts|p\/|reel\/|direct|about)/i;
   if (!igExclude.test(url)) {
     const igMatch = url.match(/instagram\.com\/@?([\w.]+)/);
@@ -97,10 +96,7 @@ async function populateSheets() {
     chrome.storage.local.get(['livechrome_sheet_id', 'livechrome_sheet_name'], resolve)
   );
 
-  // Clear existing options
   sheetSelect.innerHTML = '';
-
-  // Add the user's provisioned sheet
   const name = stored.livechrome_sheet_name || 'My Creator Sheet';
   const opt = document.createElement('option');
   opt.value = name;
@@ -108,28 +104,32 @@ async function populateSheets() {
   sheetSelect.appendChild(opt);
 }
 
-// ─── Save to backend ──────────────────────────────────────────────────────
+// ─── Save to backend via background service worker ─────────────────────────
 async function postToSheet(data) {
   const stored = await new Promise((resolve) =>
     chrome.storage.local.get(['livechrome_token'], resolve)
   );
 
-  const response = await fetch(`${CONFIG.BACKEND_URL}/save`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      token: stored.livechrome_token,
-      handle: data.handle.replace('@', ''),
-      platform: data.platform,
-    }),
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({
+      type: 'SAVE_TO_SHEET',
+      payload: {
+        token: stored.livechrome_token,
+        handle: data.handle.replace('@', ''),
+        platform: data.platform,
+      },
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (response?.error) {
+        reject(new Error(response.error));
+        return;
+      }
+      resolve(response);
+    });
   });
-
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.error || `HTTP ${response.status}`);
-  }
-
-  return response.json();
 }
 
 // ─── Save handler ──────────────────────────────────────────────────────────
@@ -145,7 +145,6 @@ saveBtn.addEventListener('click', async () => {
       platform: currentPlatform,
     });
 
-    // Show match score if returned
     const scoreText = result.data?.matchScore != null
       ? ` — ${result.data.matchScore}% match`
       : '';
@@ -174,14 +173,12 @@ saveBtn.addEventListener('click', async () => {
 
 // ─── Init ──────────────────────────────────────────────────────────────────
 async function init() {
-  // Cache the tab URL for detectPlatform()
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     window._currentTabUrl = tabs[0]?.url || '';
   });
 
   showLoading();
 
-  // ─── Authenticate with Google token (secure POST) ─────────────────────
   try {
     const googleToken = await getGoogleToken();
 
@@ -198,7 +195,6 @@ async function init() {
       return;
     }
 
-    // Persist session data
     chrome.storage.local.set({
       livechrome_token: verifyData.token,
       livechrome_sheet_id: verifyData.sheetId,
@@ -209,10 +205,8 @@ async function init() {
     return;
   }
 
-  // Populate sheet dropdown
   await populateSheets();
 
-  // Detect handle from active tab
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const tab = tabs[0];
     if (!tab || !tab.url) {
