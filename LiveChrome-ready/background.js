@@ -1,4 +1,6 @@
 // Service worker — manages saved creators via chrome.storage
+const BACKEND_URL = 'https://backendchrome-production-de12.up.railway.app';
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "SAVE_CREATOR") {
     const creator = message.payload;
@@ -20,7 +22,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     });
 
-    return true; // keep message channel open for async sendResponse
+    return true;
   }
 
   if (message.type === "GET_SAVED") {
@@ -34,6 +36,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.storage.local.set({ savedCreators: [] }, () => {
       sendResponse({ success: true });
     });
+    return true;
+  }
+
+  if (message.type === "SAVE_TO_SHEET") {
+    const { token, handle, platform } = message.payload;
+    fetch(`${BACKEND_URL}/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, handle, platform }),
+    })
+      .then(res => res.json())
+      .then(data => sendResponse(data))
+      .catch(err => sendResponse({ error: err.message }));
     return true;
   }
 });
