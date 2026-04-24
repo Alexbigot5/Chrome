@@ -189,12 +189,19 @@
       return stored.livechrome_token;
     }
 
+    // chrome.identity is not available in content scripts — ask background worker
     const googleToken = await new Promise((resolve, reject) => {
-      chrome.identity.getAuthToken({ interactive: true }, (token) => {
-        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-        else resolve(token);
+      chrome.runtime.sendMessage({ type: 'GET_GOOGLE_TOKEN' }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else if (response?.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response?.token);
+        }
       });
     });
+    if (!googleToken) return null;
 
     const res  = await fetch(`${BACKEND_URL}/verify`, {
       method: 'POST',
