@@ -1,10 +1,21 @@
 // LiveChrome — service worker
-// Handles SAVE_TO_SHEET messages and storage helpers.
-// Brand intelligence is dashboard-only — no brand handlers here.
+// Handles SAVE_TO_SHEET messages and identity (chrome.identity only works here).
 
 const BACKEND_URL = 'https://backendchrome-production-de12.up.railway.app';
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+
+  // Content script can't use chrome.identity — proxy it through here
+  if (message.type === 'GET_GOOGLE_TOKEN') {
+    chrome.identity.getAuthToken({ interactive: true }, (token) => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ error: chrome.runtime.lastError.message });
+      } else {
+        sendResponse({ token });
+      }
+    });
+    return true; // keep channel open for async
+  }
 
   if (message.type === 'SAVE_TO_SHEET') {
     const { token, handle, platform } = message.payload;
@@ -16,7 +27,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(res => res.json())
       .then(data => sendResponse(data))
       .catch(err => sendResponse({ error: err.message }));
-    return true; // keep channel open for async response
+    return true;
   }
 
   if (message.type === 'GET_FIELDS') {
