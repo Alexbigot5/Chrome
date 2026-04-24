@@ -1,45 +1,12 @@
-// Service worker — manages saved creators via chrome.storage
+// LiveChrome — service worker
+// Handles SAVE_TO_SHEET messages and storage helpers.
+// Brand intelligence is dashboard-only — no brand handlers here.
+
 const BACKEND_URL = 'https://backendchrome-production-de12.up.railway.app';
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "SAVE_CREATOR") {
-    const creator = message.payload;
-    chrome.storage.local.get({ savedCreators: [] }, (result) => {
-      const list = result.savedCreators;
 
-      // Avoid exact duplicate saves (same handle + same date)
-      const isDuplicate = list.some(
-        (c) => c.handle === creator.handle && c.dateSaved === creator.dateSaved
-      );
-
-      if (!isDuplicate) {
-        list.push(creator);
-        chrome.storage.local.set({ savedCreators: list }, () => {
-          sendResponse({ success: true, total: list.length });
-        });
-      } else {
-        sendResponse({ success: false, reason: "duplicate" });
-      }
-    });
-
-    return true;
-  }
-
-  if (message.type === "GET_SAVED") {
-    chrome.storage.local.get({ savedCreators: [] }, (result) => {
-      sendResponse({ creators: result.savedCreators });
-    });
-    return true;
-  }
-
-  if (message.type === "CLEAR_SAVED") {
-    chrome.storage.local.set({ savedCreators: [] }, () => {
-      sendResponse({ success: true });
-    });
-    return true;
-  }
-
-  if (message.type === "SAVE_TO_SHEET") {
+  if (message.type === 'SAVE_TO_SHEET') {
     const { token, handle, platform } = message.payload;
     fetch(`${BACKEND_URL}/save`, {
       method: 'POST',
@@ -49,6 +16,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(res => res.json())
       .then(data => sendResponse(data))
       .catch(err => sendResponse({ error: err.message }));
+    return true; // keep channel open for async response
+  }
+
+  if (message.type === 'GET_FIELDS') {
+    chrome.storage.local.get(['livechrome_fields'], (result) => {
+      sendResponse({
+        fields: result.livechrome_fields || ['followers', 'eng', 'views', 'likes', 'comments', 'cost'],
+      });
+    });
     return true;
   }
+
+  if (message.type === 'CLEAR_AUTH') {
+    chrome.storage.local.remove(['livechrome_token', 'livechrome_sheet_id', 'livechrome_fields'], () => {
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+
 });
