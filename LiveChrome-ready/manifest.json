@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "LiveChrome — Creator Intelligence",
+  "name": "LiveChrome \u2014 Creator Intelligence",
   "version": "2.0.0",
   "description": "Instantly surface TikTok & Instagram creator stats while browsing.",
   "permissions": [
@@ -10,7 +10,7 @@
     "identity"
   ],
   "oauth2": {
-    "client_id": "985936531089-dldqv4thrguoluvcu6ci9lcpqmam347p.apps.googleusercontent.com",
+    "client_id": "985936531089-4j7mogqmnsb9dk61echhipoq7iloq4dt.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/userinfo.email"
     ]
@@ -38,8 +38,12 @@
         "https://www.instagram.com/*",
         "https://instagram.com/*"
       ],
-      "js": ["content.js"],
-      "css": ["sidebar.css"],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "sidebar.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -48,7 +52,12 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["sidebar.html", "sidebar-app.js", "sidebar.css", "icons/*"],
+      "resources": [
+        "sidebar.html",
+        "sidebar-app.js",
+        "sidebar.css",
+        "icons/*"
+      ],
       "matches": [
         "https://www.tiktok.com/*",
         "https://tiktok.com/*",
