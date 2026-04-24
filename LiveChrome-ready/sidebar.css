@@ -1,0 +1,61 @@
+/* LiveChrome sidebar injection styles */
+
+#livechrome-sidebar-root {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 100vh;
+  z-index: 2147483647;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#livechrome-sidebar-root.open {
+  width: 320px;
+  pointer-events: auto;
+}
+
+#livechrome-sidebar-root iframe {
+  width: 320px;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+/* Toggle button — bolt icon, pinned to right edge */
+#livechrome-toggle-btn {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 2147483646;
+  width: 28px;
+  height: 52px;
+  background: #1c1a15;
+  border: none;
+  border-radius: 6px 0 0 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fbfaf6;
+  box-shadow: -2px 0 12px rgba(0,0,0,0.18);
+  transition: width 0.15s ease, background 0.15s ease, right 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: auto;
+}
+
+#livechrome-toggle-btn:hover {
+  width: 32px;
+  background: #2e2b22;
+}
+
+#livechrome-toggle-btn svg {
+  flex-shrink: 0;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#livechrome-toggle-btn.open svg {
+  transform: rotate(180deg);
+}
