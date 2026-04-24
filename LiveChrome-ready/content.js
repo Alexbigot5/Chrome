@@ -10,11 +10,9 @@
   function detectPage() {
     const url = window.location.href;
 
-    // TikTok profile: tiktok.com/@handle
     const tt = url.match(/tiktok\.com\/@([\w.]+)(?:\/|$|\?)/);
     if (tt) return { platform: 'tiktok', handle: tt[1] };
 
-    // Instagram profile — exclude non-profile paths
     const igSkip = /instagram\.com\/(explore|reels|stories|accounts|p\/|reel\/|direct|about|tv\/)/i;
     if (!igSkip.test(url)) {
       const ig = url.match(/instagram\.com\/@?([\w.]+)(?:\/|$|\?)/);
@@ -33,23 +31,104 @@
   iframe.src = chrome.runtime.getURL('sidebar.html');
   root.appendChild(iframe);
 
-  // Toggle button
+  // ── Toggle button — all styles inline to survive host CSS ──
   const toggleBtn = document.createElement('button');
   toggleBtn.id = 'livechrome-toggle-btn';
   toggleBtn.title = 'LiveChrome';
-  toggleBtn.innerHTML = `
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"
-      stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
-      <path d="M8.5 1.5L3 9h4l-1 5.5L12 7H8l.5-5.5z"/>
-    </svg>`;
+  // All styles inline — TikTok/Instagram CSS can't override these
+  toggleBtn.setAttribute('style', [
+    'position:fixed',
+    'top:50%',
+    'right:0',
+    'transform:translateY(-50%)',
+    'z-index:2147483646',
+    'width:28px',
+    'height:52px',
+    'background:#1c1a15',
+    'border:none',
+    'border-radius:6px 0 0 6px',
+    'cursor:pointer',
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
+    'color:#fbfaf6',
+    'box-shadow:-2px 0 12px rgba(0,0,0,0.18)',
+    'transition:width 0.15s ease,background 0.15s ease,right 0.22s cubic-bezier(0.4,0,0.2,1)',
+    'pointer-events:auto',
+    'padding:0',
+    'margin:0',
+    'outline:none',
+    'box-sizing:border-box',
+    'font-family:inherit',
+    'line-height:1',
+  ].join(';'));
+  toggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" style="display:block;pointer-events:none"><path d="M8.5 1.5L3 9h4l-1 5.5L12 7H8l.5-5.5z"/></svg>`;
   document.body.appendChild(toggleBtn);
 
   let isOpen = false;
+  let iframeReady = false;
+  const pendingMessages = [];
+
+  // ── Wait for iframe to signal it's ready ──────────────────
+  // sidebar-app.js posts 'SIDEBAR_READY' once its message listener is set up
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SIDEBAR_READY') {
+      iframeReady = true;
+      // Flush any messages that were sent before iframe was ready
+      pendingMessages.forEach(msg => iframe.contentWindow.postMessage(msg, '*'));
+      pendingMessages.length = 0;
+    }
+
+    const msg = event.data;
+    if (!msg || msg.source !== 'livechrome-sidebar') return;
+
+    if (msg.type === 'SAVE_TO_SHEET') {
+      postToSidebar({ type: 'SAVE_STATE', state: 'saving' });
+      (async () => {
+        try {
+          const token = cachedToken || await getToken();
+          const page  = detectPage();
+          if (!token || !page) throw new Error('Not authenticated');
+
+          const res    = await fetch(`${BACKEND_URL}/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, handle: page.handle, platform: page.platform }),
+          });
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || 'Save failed');
+
+          postToSidebar({ type: 'SAVE_STATE', state: 'saved' });
+          setTimeout(() => postToSidebar({ type: 'SAVE_STATE', state: 'idle' }), 2400);
+        } catch (err) {
+          postToSidebar({ type: 'SAVE_STATE', state: 'error', error: err.message });
+          setTimeout(() => postToSidebar({ type: 'SAVE_STATE', state: 'idle' }), 3000);
+        }
+      })();
+    }
+
+    if (msg.type === 'RETRY') {
+      initSidebar();
+    }
+
+    if (msg.type === 'CLOSE_SIDEBAR') {
+      closeSidebar();
+    }
+  });
 
   function openSidebar() {
     isOpen = true;
-    root.classList.add('open');
-    toggleBtn.classList.add('open');
+    root.style.cssText = [
+      'position:fixed',
+      'top:0',
+      'right:0',
+      'width:320px',
+      'height:100vh',
+      'z-index:2147483647',
+      'overflow:hidden',
+      'pointer-events:auto',
+      'transition:width 0.22s cubic-bezier(0.4,0,0.2,1)',
+    ].join(';');
     toggleBtn.style.right = '320px';
     document.body.style.transition = 'margin-right 0.22s cubic-bezier(0.4,0,0.2,1)';
     document.body.style.marginRight = '320px';
@@ -58,15 +137,44 @@
 
   function closeSidebar() {
     isOpen = false;
-    root.classList.remove('open');
-    toggleBtn.classList.remove('open');
+    root.style.cssText = [
+      'position:fixed',
+      'top:0',
+      'right:0',
+      'width:0',
+      'height:100vh',
+      'z-index:2147483647',
+      'overflow:hidden',
+      'pointer-events:none',
+      'transition:width 0.22s cubic-bezier(0.4,0,0.2,1)',
+    ].join(';');
     toggleBtn.style.right = '0';
     document.body.style.marginRight = '0';
     chrome.storage.local.set({ livechrome_sidebar_open: false });
   }
 
+  // Set initial root styles inline (don't rely on sidebar.css for root)
+  closeSidebar();
+
   toggleBtn.addEventListener('click', () => {
-    if (isOpen) { closeSidebar(); } else { openSidebar(); initSidebar(); }
+    if (isOpen) {
+      closeSidebar();
+    } else {
+      openSidebar();
+      // If iframe is already ready, init immediately
+      // Otherwise it will init when SIDEBAR_READY fires
+      if (iframeReady) {
+        initSidebar();
+      }
+      // Always set a fallback: if SIDEBAR_READY never fires (e.g. already loaded),
+      // kick off init after a short delay
+      setTimeout(() => {
+        if (!iframeReady) {
+          iframeReady = true;
+          initSidebar();
+        }
+      }, 500);
+    }
   });
 
   // ── Auth ──────────────────────────────────────────────────
@@ -104,9 +212,7 @@
     return data.token;
   }
 
-  // ── Sync field preferences from backend ──────────────────
-  // Reads user's onboarding selections from DB and caches in storage.
-  // Only runs once per session (fieldsAlreadySynced flag).
+  // ── Sync field preferences ────────────────────────────────
   let fieldsAlreadySynced = false;
 
   async function syncUserFields(token) {
@@ -131,7 +237,7 @@
     return stored.livechrome_fields || ['followers', 'eng', 'views', 'likes', 'comments', 'cost'];
   }
 
-  // ── Init: detect page, auth, scrape, send to sidebar ─────
+  // ── Init sidebar ──────────────────────────────────────────
   async function initSidebar() {
     const page = detectPage();
     postToSidebar({ type: 'SET_PAGE', page });
@@ -150,7 +256,6 @@
         return;
       }
 
-      // Sync field choices once per session
       if (!fieldsAlreadySynced) {
         await syncUserFields(token);
         fieldsAlreadySynced = true;
@@ -159,7 +264,6 @@
       const fields = await getUserFields();
       postToSidebar({ type: 'SET_FIELDS', fields });
 
-      // Scrape — previewOnly means no sheet write yet
       const scrapeRes = await fetch(`${BACKEND_URL}/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -186,53 +290,25 @@
   }
 
   function postToSidebar(msg) {
-    if (iframe.contentWindow) iframe.contentWindow.postMessage(msg, '*');
+    if (!iframeReady) {
+      // Queue messages until iframe signals ready
+      pendingMessages.push(msg);
+      return;
+    }
+    if (iframe.contentWindow) {
+      iframe.contentWindow.postMessage(msg, '*');
+    }
   }
 
-  // ── Messages from sidebar ─────────────────────────────────
-  window.addEventListener('message', async (event) => {
-    const msg = event.data;
-    if (!msg || msg.source !== 'livechrome-sidebar') return;
-
-    // User clicked "Save to Sheet"
-    if (msg.type === 'SAVE_TO_SHEET') {
-      postToSidebar({ type: 'SAVE_STATE', state: 'saving' });
-      try {
-        const token = cachedToken || await getToken();
-        const page  = detectPage();
-        if (!token || !page) throw new Error('Not authenticated');
-
-        const res    = await fetch(`${BACKEND_URL}/save`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, handle: page.handle, platform: page.platform }),
-        });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Save failed');
-
-        postToSidebar({ type: 'SAVE_STATE', state: 'saved' });
-        setTimeout(() => postToSidebar({ type: 'SAVE_STATE', state: 'idle' }), 2400);
-      } catch (err) {
-        postToSidebar({ type: 'SAVE_STATE', state: 'error', error: err.message });
-        setTimeout(() => postToSidebar({ type: 'SAVE_STATE', state: 'idle' }), 3000);
-      }
-    }
-
-    if (msg.type === 'RETRY') {
-      initSidebar();
-    }
-
-    if (msg.type === 'CLOSE_SIDEBAR') {
-      closeSidebar();
-    }
-  });
-
-  // Auto-open if sidebar was open on last visit
+  // Auto-open if was open on last visit
   chrome.storage.local.get(['livechrome_sidebar_open'], (result) => {
-    if (result.livechrome_sidebar_open) { openSidebar(); initSidebar(); }
+    if (result.livechrome_sidebar_open) {
+      openSidebar();
+      // initSidebar will be triggered by SIDEBAR_READY or the fallback timeout
+    }
   });
 
-  // SPA navigation — re-scrape when URL changes (TikTok/IG are SPAs)
+  // SPA navigation
   let lastUrl = location.href;
   new MutationObserver(() => {
     if (location.href !== lastUrl) {
