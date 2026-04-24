@@ -13,8 +13,8 @@ const C = {
   textDim:    '#6b6658',
   textFaint:  '#9a9486',
 };
-const MONO = "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace";
-const UI   = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+const MONO = "ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace";
+const UI = "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
 
 // ── App state ─────────────────────────────────────────────────
 let state = {
@@ -554,3 +554,6 @@ window.addEventListener('message', (event) => {
 
 // ── Boot ──────────────────────────────────────────────────────
 render();
+
+// Signal to content.js that the sidebar iframe is ready to receive messages
+window.parent.postMessage({ type: 'SIDEBAR_READY' }, '*');
