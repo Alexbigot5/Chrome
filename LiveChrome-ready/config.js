@@ -8,5 +8,5 @@
 
 const CONFIG = {
   BACKEND_URL: 'https://backendchrome-production-de12.up.railway.app',
-  CLIENT_ID: '985936531089-dldqv4thrguoluvcu6ci9lcpqmam347p.apps.googleusercontent.com',
+  CLIENT_ID: '985936531089-4j7mogqmnsb9dk61echhipoq7iloq4dt.apps.googleusercontent.com',
 };
