@@ -33,7 +33,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'GET_FIELDS') {
     chrome.storage.local.get(['livechrome_fields'], (result) => {
       sendResponse({
-        fields: result.livechrome_fields || ['followers', 'eng', 'views', 'likes', 'comments', 'cost'],
+        fields: result.livechrome_fields || ['followers', 'engagementRate', 'avgViews', 'avgLikes', 'avgComments', 'estimatedCpm'],
       });
     });
     return true;
