@@ -241,7 +241,8 @@
     const stored = await new Promise(r =>
       chrome.storage.local.get(['livechrome_fields'], r)
     );
-    return stored.livechrome_fields || ['followers', 'eng', 'views', 'likes', 'comments', 'cost'];
+    // Default keys match onboarding field keys and FIELD_CONFIG in sidebar-app.js
+    return stored.livechrome_fields || ['followers', 'engagementRate', 'avgViews', 'avgLikes', 'avgComments', 'estimatedCpm'];
   }
 
   // ── Init sidebar ──────────────────────────────────────────
