@@ -22,7 +22,7 @@ let state = {
   handle:    null,
   platform:  null,
   data:      null,
-  fields:    ['followers', 'eng', 'views', 'likes', 'comments', 'cost'],
+  fields:    ['followers', 'engagementRate', 'avgViews', 'avgLikes', 'avgComments', 'estimatedCpm'],
   saveState: 'idle',      // idle | saving | saved | error
   error:     null,
 };
@@ -33,7 +33,7 @@ function setState(patch) {
 }
 
 // ── Field definitions ─────────────────────────────────────────
-// key must match onboarding keys and sheets.js CREATOR_FIELDS keys
+// Keys match onboarding field keys and backend FIELD_LABELS keys exactly
 const FIELD_CONFIG = {
   followers: {
     label:    'Followers',
@@ -41,13 +41,13 @@ const FIELD_CONFIG = {
     icon:     icon('M6 8a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM1.5 14c0-2.2 2-4 4.5-4s4.5 1.8 4.5 4M11 4.5a2 2 0 110 4M11.5 10c1.8.2 3 1.8 3 4'),
     getValue: (d) => fmtNum(d?.followers),
   },
-  eng: {
+  engagementRate: {
     label:    'Eng Rate',
     tt:       'Avg (likes+comments) ÷ followers across last 8 posts',
     icon:     icon('M2 11l4-4 3 3 5-6M9 4h4v4'),
     getValue: (d) => d?.engagementRate || '—',
   },
-  views: {
+  avgViews: {
     label:    'Avg Views',
     tt:       'Average views across last 8 posts',
     icon:     iconMulti([
@@ -56,29 +56,29 @@ const FIELD_CONFIG = {
     ]),
     getValue: (d) => fmtNum(d?.avgViews),
   },
-  likes: {
+  avgLikes: {
     label:    'Avg Likes',
     tt:       'Average likes per post across last 8 posts',
     icon:     icon('M8 13.5S2 10 2 5.8A3.3 3.3 0 015.3 2.5c1.2 0 2.2.6 2.7 1.5.5-.9 1.5-1.5 2.7-1.5A3.3 3.3 0 0114 5.8C14 10 8 13.5 8 13.5z'),
     getValue: (d) => fmtNum(d?.avgLikes),
   },
-  comments: {
+  avgComments: {
     label:    'Avg Comments',
     tt:       'Average comments per post across last 8 posts',
     icon:     icon('M14 8.5a5.5 5.5 0 01-8.2 4.8L2.5 14l.7-3.3A5.5 5.5 0 1114 8.5z'),
     getValue: (d) => fmtNum(d?.avgComments),
   },
-  cost: {
-    label:    'Post Cost',
-    tt:       'Estimated cost per post — avg views × tier rate',
-    icon:     iconCircle(),
-    getValue: (d) => d?.estimatedPostCost || '—',
-  },
-  cpm: {
+  estimatedCpm: {
     label:    'Est. CPM',
     tt:       'Estimated cost per 1,000 views',
     icon:     iconCircle(),
     getValue: (d) => d?.estimatedCpm || '—',
+  },
+  estimatedPostCost: {
+    label:    'Post Cost',
+    tt:       'Estimated cost per post — avg views × tier rate',
+    icon:     iconCircle(),
+    getValue: (d) => d?.estimatedPostCost || '—',
   },
   videos: {
     label:    'Total Videos',
@@ -275,12 +275,22 @@ function buildStatsGrid() {
 
   const grid = el('div', 'display:grid;grid-template-columns:1fr 1fr;gap:8px;');
 
-  state.fields.forEach(key => {
-    const cfg = FIELD_CONFIG[key];
-    if (!cfg) return;
-    const value = cfg.getValue(state.data);
-    grid.appendChild(buildStatTile(cfg.icon, cfg.label, cfg.tt, value));
-  });
+  // Only render tiles for fields the user selected that have a matching config
+  const fieldsToRender = state.fields.filter(key => FIELD_CONFIG[key]);
+
+  if (fieldsToRender.length === 0) {
+    const empty = el('div', `
+      grid-column:1/-1; padding:24px 12px; text-align:center;
+      font-size:12px; color:${C.textFaint};
+    `, { text: 'No fields selected — update your preferences in the dashboard.' });
+    grid.appendChild(empty);
+  } else {
+    fieldsToRender.forEach(key => {
+      const cfg = FIELD_CONFIG[key];
+      const value = cfg.getValue(state.data);
+      grid.appendChild(buildStatTile(cfg.icon, cfg.label, cfg.tt, value));
+    });
+  }
 
   wrap.appendChild(grid);
   return wrap;
@@ -541,7 +551,10 @@ window.addEventListener('message', (event) => {
       setState({ uiState: msg.state, error: msg.error || null });
       break;
     case 'SET_FIELDS':
-      setState({ fields: msg.fields });
+      // Only update if we actually received valid fields
+      if (Array.isArray(msg.fields) && msg.fields.length > 0) {
+        setState({ fields: msg.fields });
+      }
       break;
     case 'SET_DATA':
       setState({ data: msg.data, handle: msg.handle || state.handle, platform: msg.platform || state.platform });
