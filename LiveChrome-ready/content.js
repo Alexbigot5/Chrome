@@ -35,7 +35,6 @@
   const toggleBtn = document.createElement('button');
   toggleBtn.id = 'livechrome-toggle-btn';
   toggleBtn.title = 'LiveChrome';
-  // All styles inline — TikTok/Instagram CSS can't override these
   toggleBtn.setAttribute('style', [
     'position:fixed',
     'top:50%',
@@ -70,11 +69,9 @@
   const pendingMessages = [];
 
   // ── Wait for iframe to signal it's ready ──────────────────
-  // sidebar-app.js posts 'SIDEBAR_READY' once its message listener is set up
   window.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SIDEBAR_READY') {
       iframeReady = true;
-      // Flush any messages that were sent before iframe was ready
       pendingMessages.forEach(msg => iframe.contentWindow.postMessage(msg, '*'));
       pendingMessages.length = 0;
     }
@@ -153,7 +150,6 @@
     chrome.storage.local.set({ livechrome_sidebar_open: false });
   }
 
-  // Set initial root styles inline (don't rely on sidebar.css for root)
   closeSidebar();
 
   toggleBtn.addEventListener('click', () => {
@@ -161,13 +157,9 @@
       closeSidebar();
     } else {
       openSidebar();
-      // If iframe is already ready, init immediately
-      // Otherwise it will init when SIDEBAR_READY fires
       if (iframeReady) {
         initSidebar();
       }
-      // Always set a fallback: if SIDEBAR_READY never fires (e.g. already loaded),
-      // kick off init after a short delay
       setTimeout(() => {
         if (!iframeReady) {
           iframeReady = true;
@@ -189,7 +181,6 @@
       return stored.livechrome_token;
     }
 
-    // chrome.identity is not available in content scripts — ask background worker
     const googleToken = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ type: 'GET_GOOGLE_TOKEN' }, (response) => {
         if (chrome.runtime.lastError) {
@@ -219,30 +210,34 @@
     return data.token;
   }
 
-  // ── Sync field preferences ────────────────────────────────
-  let fieldsAlreadySynced = false;
+  // ── Field preferences ─────────────────────────────────────
+  // Always fetch fresh from the backend on each sidebar open so onboarding
+  // choices are reflected immediately without needing a browser restart.
+  // Falls back to chrome.storage cache if the network call fails,
+  // and to sensible defaults if nothing is cached at all.
 
-  async function syncUserFields(token) {
+  const DEFAULT_FIELDS = ['followers', 'engagementRate', 'avgViews', 'avgLikes', 'avgComments', 'estimatedCpm'];
+
+  async function fetchAndCacheFields(token) {
     try {
       const res = await fetch(`${BACKEND_URL}/onboarding/fields`, {
         headers: { 'x-livechrome-token': token },
       });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (Array.isArray(data.fields) && data.fields.length > 0) {
+        // Cache so we have it if the next request fails
         await chrome.storage.local.set({ livechrome_fields: data.fields });
+        return data.fields;
       }
+      throw new Error('Empty fields returned');
     } catch (err) {
-      console.warn('[LiveChrome] Field sync failed:', err.message);
+      console.warn('[LiveChrome] Field fetch failed, trying cache:', err.message);
+      const stored = await new Promise(r =>
+        chrome.storage.local.get(['livechrome_fields'], r)
+      );
+      return stored.livechrome_fields || DEFAULT_FIELDS;
     }
-  }
-
-  async function getUserFields() {
-    const stored = await new Promise(r =>
-      chrome.storage.local.get(['livechrome_fields'], r)
-    );
-    // Default keys match onboarding field keys and FIELD_CONFIG in sidebar-app.js
-    return stored.livechrome_fields || ['followers', 'engagementRate', 'avgViews', 'avgLikes', 'avgComments', 'estimatedCpm'];
   }
 
   // ── Init sidebar ──────────────────────────────────────────
@@ -264,12 +259,9 @@
         return;
       }
 
-      if (!fieldsAlreadySynced) {
-        await syncUserFields(token);
-        fieldsAlreadySynced = true;
-      }
-
-      const fields = await getUserFields();
+      // Fetch the user's saved field preferences from the backend.
+      // Sent BEFORE scrape data so the sidebar knows which tiles to render.
+      const fields = await fetchAndCacheFields(token);
       postToSidebar({ type: 'SET_FIELDS', fields });
 
       const scrapeRes = await fetch(`${BACKEND_URL}/save`, {
@@ -299,7 +291,6 @@
 
   function postToSidebar(msg) {
     if (!iframeReady) {
-      // Queue messages until iframe signals ready
       pendingMessages.push(msg);
       return;
     }
@@ -312,11 +303,10 @@
   chrome.storage.local.get(['livechrome_sidebar_open'], (result) => {
     if (result.livechrome_sidebar_open) {
       openSidebar();
-      // initSidebar will be triggered by SIDEBAR_READY or the fallback timeout
     }
   });
 
-  // SPA navigation
+  // SPA navigation — re-init on URL change
   let lastUrl = location.href;
   new MutationObserver(() => {
     if (location.href !== lastUrl) {
