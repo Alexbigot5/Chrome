@@ -1,4 +1,4 @@
-// LiveChrome — content script
+// WePullData — content script
 // Injects the creator intel sidebar into TikTok and Instagram profile pages.
 
 (function () {
@@ -34,7 +34,7 @@
   // ── Toggle button — all styles inline to survive host CSS ──
   const toggleBtn = document.createElement('button');
   toggleBtn.id = 'livechrome-toggle-btn';
-  toggleBtn.title = 'LiveChrome';
+  toggleBtn.title = 'WePullData';
   toggleBtn.setAttribute('style', [
     'position:fixed',
     'top:50%',
@@ -232,7 +232,7 @@
       }
       throw new Error('Empty fields returned');
     } catch (err) {
-      console.warn('[LiveChrome] Field fetch failed, trying cache:', err.message);
+      console.warn('[WePullData] Field fetch failed, trying cache:', err.message);
       const stored = await new Promise(r =>
         chrome.storage.local.get(['livechrome_fields'], r)
       );
