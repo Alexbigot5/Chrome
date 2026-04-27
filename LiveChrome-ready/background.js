@@ -1,4 +1,4 @@
-// LiveChrome — service worker
+// WePullData — service worker
 // Handles SAVE_TO_SHEET messages and identity (chrome.identity only works here).
 
 const BACKEND_URL = 'https://backendchrome-production-de12.up.railway.app';
