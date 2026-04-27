@@ -1,4 +1,4 @@
-// LiveChrome Sidebar — creator intelligence only
+// WePullData Sidebar — creator intelligence only
 // Design: warm off-white #fbfaf6, JetBrains Mono for numbers, Inter for UI
 // 320px wide, full viewport height, injected as iframe
 
@@ -188,7 +188,7 @@ function buildHeader() {
 
   const brand = el('div', 'display:flex;align-items:center;gap:8px;color:' + C.text);
   brand.innerHTML = iconBolt();
-  const name = el('span', 'font-size:13px;font-weight:600;letter-spacing:-0.2px;', { text: 'LiveChrome' });
+  const name = el('span', 'font-size:13px;font-weight:600;letter-spacing:-0.2px;', { text: 'WePullData' });
   brand.appendChild(name);
   header.appendChild(brand);
 
