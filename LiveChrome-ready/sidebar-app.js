@@ -18,14 +18,26 @@ const UI = "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif
 
 // ── App state ─────────────────────────────────────────────────
 let state = {
-  uiState:   'loading',   // loading | ready | locked | notfound | error
-  handle:    null,
-  platform:  null,
-  data:      null,
-  fields:    ['followers', 'engagementRate', 'avgViews', 'avgLikes', 'avgComments', 'estimatedCpm'],
-  saveState: 'idle',      // idle | saving | saved | error
-  error:     null,
+  uiState:     'loading',   // loading | ready | locked | notfound | error
+  view:        'main',      // main | sheets
+  handle:      null,
+  platform:    null,
+  data:        null,
+  fields:      ['followers', 'engagementRate', 'avgViews', 'avgLikes', 'avgComments', 'estimatedCpm'],
+  saveState:   'idle',      // idle | saving | saved | error
+  error:       null,
+  // Sheet picker
+  activeSheet: null,        // { id, name, url } — currently selected sheet
+  sheets:      [],          // all sheets fetched from Drive
+  sheetsState: 'idle',      // idle | loading | loaded | error
+  sheetsError: null,
 };
+
+// ── Persist active sheet to chrome.storage ────────────────────
+function loadActiveSheet() {
+  window.parent.postMessage({ source: 'livechrome-sidebar', type: 'GET_ACTIVE_SHEET' }, '*');
+}
+loadActiveSheet();
 
 function setState(patch) {
   Object.assign(state, patch);
@@ -177,37 +189,96 @@ function render() {
   root.appendChild(shell);
 }
 
-// ── Header — logo only, no mode toggle ───────────────────────
+// ── Header ────────────────────────────────────────────────────
+function iconSettings() {
+  return `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"/></svg>`;
+}
+function iconBack() {
+  return `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M10 3L5 8l5 5"/></svg>`;
+}
+function iconSheet() {
+  return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M2 6h12M2 10h12M6 2v12"/></svg>`;
+}
+function iconExtLink() {
+  return `<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M3 9l6-6M4 3h5v5"/></svg>`;
+}
+function iconCheck2() {
+  return `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M3 8.5l3 3L13 4.5"/></svg>`;
+}
+
 function buildHeader() {
   const header = el('div', `
-    padding:14px 16px 12px;
+    padding:12px 16px;
     border-bottom:1px solid ${C.border};
     display:flex; align-items:center; justify-content:space-between;
-    flex-shrink:0;
+    flex-shrink:0; min-height:44px;
   `);
 
+  if (state.view === 'sheets') {
+    // Back button + title
+    const left = el('div', 'display:flex;align-items:center;gap:8px;');
+    const backBtn = el('button', `
+      border:none; background:transparent; padding:4px; cursor:pointer;
+      color:${C.textDim}; display:flex; align-items:center; border-radius:4px;
+    `);
+    backBtn.innerHTML = iconBack();
+    backBtn.addEventListener('click', () => setState({ view: 'main' }));
+    left.appendChild(backBtn);
+    const title = el('span', `font-size:13px;font-weight:600;color:${C.text};letter-spacing:-0.2px;`, { text: 'Choose Sheet' });
+    left.appendChild(title);
+    header.appendChild(left);
+
+    // Active sheet name pill
+    if (state.activeSheet) {
+      const pill = el('div', `
+        font-size:10px; color:${C.textFaint}; font-family:${MONO};
+        background:${C.surface}; border:1px solid ${C.border};
+        padding:2px 8px; border-radius:20px; max-width:110px;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      `, { text: state.activeSheet.name });
+      header.appendChild(pill);
+    }
+    return header;
+  }
+
+  // Main view header
   const brand = el('div', 'display:flex;align-items:center;gap:8px;color:' + C.text);
   brand.innerHTML = iconBolt();
   const name = el('span', 'font-size:13px;font-weight:600;letter-spacing:-0.2px;', { text: 'WePullData' });
   brand.appendChild(name);
   header.appendChild(brand);
 
-  // Platform badge — shows which platform we're on
+  const right = el('div', 'display:flex;align-items:center;gap:8px;');
+
+  // Platform badge
   if (state.handle && state.platform) {
     const badge = el('div', `
-      display:flex; align-items:center; gap:6px;
+      display:flex; align-items:center; gap:5px;
       font-size:11px; font-weight:500; letter-spacing:0.3px;
       text-transform:uppercase; color:${C.textDim};
     `);
-    const dot = el('span', `
-      width:5px; height:5px; border-radius:50%;
-      background:${platformColor(state.platform)}; display:inline-block;
-    `);
-    const plat = el('span', '', { text: platformLabel(state.platform) });
+    const dot = el('span', `width:5px;height:5px;border-radius:50%;background:${platformColor(state.platform)};display:inline-block;`);
     badge.appendChild(dot);
-    badge.appendChild(plat);
-    header.appendChild(badge);
+    badge.appendChild(el('span', '', { text: platformLabel(state.platform) }));
+    right.appendChild(badge);
   }
+
+  // Settings gear → opens sheet picker
+  const gearBtn = el('button', `
+    border:none; background:transparent; padding:4px; cursor:pointer;
+    color:${C.textFaint}; display:flex; align-items:center; border-radius:4px;
+    transition:color .15s;
+  `);
+  gearBtn.innerHTML = iconSettings();
+  gearBtn.title = 'Switch sheet';
+  gearBtn.addEventListener('mouseenter', () => { gearBtn.style.color = C.text; });
+  gearBtn.addEventListener('mouseleave', () => { gearBtn.style.color = C.textFaint; });
+  gearBtn.addEventListener('click', () => {
+    setState({ view: 'sheets' });
+    if (state.sheetsState === 'idle') fetchSheets();
+  });
+  right.appendChild(gearBtn);
+  header.appendChild(right);
 
   return header;
 }
@@ -215,6 +286,11 @@ function buildHeader() {
 // ── Body ──────────────────────────────────────────────────────
 function buildBody() {
   const body = el('div', 'flex:1;overflow-y:auto;overflow-x:hidden;');
+
+  if (state.view === 'sheets') {
+    body.appendChild(buildSheetPicker());
+    return body;
+  }
 
   switch (state.uiState) {
     case 'loading':  body.appendChild(buildLoadingState()); break;
@@ -229,6 +305,164 @@ function buildBody() {
   }
 
   return body;
+}
+
+// ── Sheet picker view ─────────────────────────────────────────
+function fetchSheets() {
+  setState({ sheetsState: 'loading', sheetsError: null });
+  window.parent.postMessage({ source: 'livechrome-sidebar', type: 'LIST_SHEETS' }, '*');
+}
+
+function buildSheetPicker() {
+  const wrap = el('div', 'display:flex;flex-direction:column;');
+
+  // Active sheet info bar
+  if (state.activeSheet) {
+    const bar = el('div', `
+      display:flex; align-items:center; gap:8px; justify-content:space-between;
+      padding:10px 16px; background:${C.surface};
+      border-bottom:1px solid ${C.border};
+    `);
+    const left = el('div', 'display:flex;align-items:center;gap:7px;min-width:0;');
+    left.innerHTML = iconSheet();
+    const label = el('div', 'min-width:0;');
+    label.appendChild(el('div', `font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:${C.textFaint};`, { text: 'Saving to' }));
+    label.appendChild(el('div', `font-size:12px;font-weight:500;color:${C.text};font-family:${MONO};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px;`, { text: state.activeSheet.name }));
+    left.appendChild(label);
+    bar.appendChild(left);
+    if (state.activeSheet.url) {
+      const link = document.createElement('a');
+      link.href = state.activeSheet.url;
+      link.target = '_blank';
+      link.style.cssText = `color:${C.textFaint};display:flex;`;
+      link.innerHTML = iconExtLink();
+      bar.appendChild(link);
+    }
+    wrap.appendChild(bar);
+  }
+
+  // Section label + refresh
+  const topRow = el('div', `
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 16px 8px;
+  `);
+  topRow.appendChild(el('span', `font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:${C.textFaint};`, { text: 'Your Google Sheets' }));
+
+  const refreshBtn = el('button', `
+    border:none; background:transparent; cursor:pointer;
+    font-size:11px; color:${C.textFaint}; font-family:${UI};
+    padding:2px 0;
+  `, { text: 'Refresh' });
+  refreshBtn.addEventListener('click', fetchSheets);
+  topRow.appendChild(refreshBtn);
+  wrap.appendChild(topRow);
+
+  // States
+  if (state.sheetsState === 'loading') {
+    const loading = el('div', `
+      display:flex; flex-direction:column; align-items:center;
+      padding:32px 16px; gap:10px;
+    `);
+    loading.innerHTML = spinner(18);
+    loading.appendChild(el('div', `font-size:12px;color:${C.textDim};`, { text: 'Loading your sheets…' }));
+    wrap.appendChild(loading);
+    return wrap;
+  }
+
+  if (state.sheetsState === 'error') {
+    const err = el('div', `padding:16px;text-align:center;`);
+    err.appendChild(el('div', `font-size:12px;color:${C.textDim};margin-bottom:10px;`, { text: state.sheetsError || 'Could not load sheets' }));
+    const retry = el('button', `
+      border:1px solid ${C.border}; background:${C.surface};
+      color:${C.text}; font-family:${UI}; font-size:12px;
+      padding:6px 14px; border-radius:6px; cursor:pointer;
+    `, { text: 'Try again' });
+    retry.addEventListener('click', fetchSheets);
+    err.appendChild(retry);
+    wrap.appendChild(err);
+    return wrap;
+  }
+
+  if (state.sheetsState === 'loaded' && state.sheets.length === 0) {
+    wrap.appendChild(el('div', `padding:24px 16px;text-align:center;font-size:12px;color:${C.textFaint};`, { text: 'No Google Sheets found in your Drive.' }));
+    return wrap;
+  }
+
+  // Sheet list
+  if (state.sheets.length > 0) {
+    const list = el('div', 'display:flex;flex-direction:column;');
+    state.sheets.forEach((sheet, i) => {
+      const isActive = state.activeSheet?.id === sheet.id;
+      const row = el('div', `
+        display:flex; align-items:center; gap:10px;
+        padding:10px 16px; cursor:pointer;
+        border-bottom:1px solid ${C.borderSoft};
+        background:${isActive ? C.surface : 'transparent'};
+        transition:background .1s;
+      `);
+      row.addEventListener('mouseenter', () => { if (!isActive) row.style.background = C.surface; });
+      row.addEventListener('mouseleave', () => { if (!isActive) row.style.background = 'transparent'; });
+      row.addEventListener('click', () => selectSheet(sheet));
+
+      // Sheet icon
+      const iconWrap = el('div', `color:${isActive ? C.text : C.textFaint};display:flex;flex-shrink:0;`);
+      iconWrap.innerHTML = iconSheet();
+      row.appendChild(iconWrap);
+
+      // Name + modified date
+      const info = el('div', 'flex:1;min-width:0;');
+      info.appendChild(el('div', `
+        font-size:12px; font-weight:${isActive ? '600' : '400'};
+        color:${C.text}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      `, { text: sheet.name }));
+      if (sheet.modifiedTime) {
+        const d = new Date(sheet.modifiedTime);
+        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        info.appendChild(el('div', `font-size:10px;color:${C.textFaint};font-family:${MONO};`, { text: `Modified ${label}` }));
+      }
+      row.appendChild(info);
+
+      // Checkmark if active, open link otherwise
+      const actions = el('div', 'display:flex;align-items:center;gap:6px;flex-shrink:0;');
+      if (isActive) {
+        const check = el('div', `color:${C.text};display:flex;`);
+        check.innerHTML = iconCheck2();
+        actions.appendChild(check);
+      }
+      if (sheet.url) {
+        const link = document.createElement('a');
+        link.href = sheet.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.style.cssText = `color:${C.textFaint};display:flex;`;
+        link.innerHTML = iconExtLink();
+        link.addEventListener('click', e => e.stopPropagation());
+        actions.appendChild(link);
+      }
+      row.appendChild(actions);
+
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
+  }
+
+  // Hint at bottom
+  wrap.appendChild(el('div', `
+    padding:12px 16px; font-size:11px; color:${C.textFaint}; line-height:1.4;
+    border-top:1px solid ${C.borderSoft}; margin-top:auto;
+  `, { text: 'Tap a sheet to save creators into it. Changes take effect immediately.' }));
+
+  return wrap;
+}
+
+function selectSheet(sheet) {
+  setState({ activeSheet: sheet, view: 'main' });
+  // Persist to chrome.storage via content.js proxy
+  window.parent.postMessage({
+    source: 'livechrome-sidebar',
+    type:   'SET_ACTIVE_SHEET',
+    sheet,
+  }, '*');
 }
 
 // ── Profile row — handle + copy button ───────────────────────
@@ -358,7 +592,7 @@ function hideTooltip() {
 function buildFooter() {
   const footer = el('div', `margin-top:auto;border-top:1px solid ${C.border};flex-shrink:0;`);
 
-  // Tooltip bar sits above save button
+  // Tooltip bar
   tooltipEl = el('div', `
     padding:6px 12px; min-height:26px;
     font-size:11px; color:transparent;
@@ -366,6 +600,32 @@ function buildFooter() {
     transition:color .12s; font-style:italic;
   `, { text: '·' });
   footer.appendChild(tooltipEl);
+
+  // Active sheet indicator — shows which sheet the save will go into
+  if (state.activeSheet && state.view === 'main') {
+    const sheetBar = el('div', `
+      display:flex; align-items:center; justify-content:space-between;
+      padding:6px 14px; border-top:1px solid ${C.borderSoft};
+    `);
+    const left = el('div', 'display:flex;align-items:center;gap:6px;min-width:0;');
+    const iconWrap = el('div', `color:${C.textFaint};display:flex;flex-shrink:0;`);
+    iconWrap.innerHTML = iconSheet();
+    left.appendChild(iconWrap);
+    left.appendChild(el('span', `font-size:11px;color:${C.textDim};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px;`, { text: state.activeSheet.name }));
+    sheetBar.appendChild(left);
+
+    const switchBtn = el('button', `
+      border:none; background:transparent; cursor:pointer;
+      font-size:11px; color:${C.textFaint}; font-family:${UI};
+      flex-shrink:0; padding:0;
+    `, { text: 'Switch' });
+    switchBtn.addEventListener('click', () => {
+      setState({ view: 'sheets' });
+      if (state.sheetsState === 'idle') fetchSheets();
+    });
+    sheetBar.appendChild(switchBtn);
+    footer.appendChild(sheetBar);
+  }
 
   const padded = el('div', 'padding:0 14px 14px;');
   padded.appendChild(buildSaveButton());
@@ -551,7 +811,6 @@ window.addEventListener('message', (event) => {
       setState({ uiState: msg.state, error: msg.error || null });
       break;
     case 'SET_FIELDS':
-      // Only update if we actually received valid fields
       if (Array.isArray(msg.fields) && msg.fields.length > 0) {
         setState({ fields: msg.fields });
       }
@@ -561,6 +820,17 @@ window.addEventListener('message', (event) => {
       break;
     case 'SAVE_STATE':
       setState({ saveState: msg.state });
+      break;
+
+    // Sheet picker responses
+    case 'SHEETS_LOADED':
+      setState({ sheets: msg.sheets || [], sheetsState: 'loaded', sheetsError: null });
+      break;
+    case 'SHEETS_ERROR':
+      setState({ sheetsState: 'error', sheetsError: msg.error || 'Failed to load sheets' });
+      break;
+    case 'ACTIVE_SHEET_LOADED':
+      if (msg.sheet) setState({ activeSheet: msg.sheet });
       break;
   }
 });
