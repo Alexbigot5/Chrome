@@ -87,10 +87,14 @@
           const page  = detectPage();
           if (!token || !page) throw new Error('Not authenticated');
 
+          // Use the user-selected sheet if set, otherwise backend uses default
+          const stored   = await new Promise(r => chrome.storage.local.get(['livechrome_active_sheet'], r));
+          const sheetId  = stored.livechrome_active_sheet?.id || null;
+
           const res    = await fetch(`${BACKEND_URL}/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token, handle: page.handle, platform: page.platform }),
+            body: JSON.stringify({ token, handle: page.handle, platform: page.platform, sheetId }),
           });
           const result = await res.json();
           if (!res.ok) throw new Error(result.error || 'Save failed');
@@ -102,6 +106,29 @@
           setTimeout(() => postToSidebar({ type: 'SAVE_STATE', state: 'idle' }), 3000);
         }
       })();
+    }
+
+    // ── Sheet picker messages ─────────────────────────────────
+    if (msg.type === 'LIST_SHEETS') {
+      chrome.runtime.sendMessage({ type: 'LIST_SHEETS' }, (response) => {
+        if (chrome.runtime.lastError || response?.error) {
+          postToSidebar({ type: 'SHEETS_ERROR', error: response?.error || 'Failed to list sheets' });
+        } else {
+          postToSidebar({ type: 'SHEETS_LOADED', sheets: response.sheets });
+        }
+      });
+    }
+
+    if (msg.type === 'SET_ACTIVE_SHEET') {
+      chrome.storage.local.set({ livechrome_active_sheet: msg.sheet });
+    }
+
+    if (msg.type === 'GET_ACTIVE_SHEET') {
+      chrome.storage.local.get(['livechrome_active_sheet'], (result) => {
+        if (result.livechrome_active_sheet) {
+          postToSidebar({ type: 'ACTIVE_SHEET_LOADED', sheet: result.livechrome_active_sheet });
+        }
+      });
     }
 
     if (msg.type === 'RETRY') {
