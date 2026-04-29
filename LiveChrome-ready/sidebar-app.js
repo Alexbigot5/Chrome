@@ -18,7 +18,7 @@ const UI = "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif
 
 // ── App state ─────────────────────────────────────────────────
 let state = {
-  uiState:     'loading',   // loading | ready | locked | notfound | error
+  uiState:     'authenticating', // authenticating | ready | locked | notfound | error
   view:        'main',      // main | sheets
   handle:      null,
   platform:    null,
@@ -293,14 +293,19 @@ function buildBody() {
   }
 
   switch (state.uiState) {
-    case 'loading':  body.appendChild(buildLoadingState()); break;
+    case 'authenticating': body.appendChild(buildAuthenticatingState()); break;
     case 'locked':   body.appendChild(buildLockedState());  break;
     case 'notfound': body.appendChild(buildNotFoundState()); break;
     case 'error':    body.appendChild(buildErrorState());   break;
     case 'ready':
       body.appendChild(buildProfileRow());
-      body.appendChild(buildDivider());
-      body.appendChild(buildStatsGrid());
+      // Only show stats grid after a save has returned data
+      if (state.data) {
+        body.appendChild(buildDivider());
+        body.appendChild(buildStatsGrid());
+      } else {
+        body.appendChild(buildPreSaveHint());
+      }
       break;
   }
 
@@ -678,27 +683,36 @@ function buildSaveButton() {
 }
 
 // ── Empty / error states ──────────────────────────────────────
-function buildLoadingState() {
+
+// Shown briefly while token is being retrieved — not during scraping
+function buildAuthenticatingState() {
   const wrap = el('div', `
     flex:1; display:flex; flex-direction:column;
     align-items:center; justify-content:center;
-    padding:40px 24px; gap:14px;
+    padding:40px 24px; gap:12px;
   `);
-  wrap.innerHTML = spinner(22);
+  wrap.innerHTML = spinner(18);
+  wrap.appendChild(el('div', `font-size:12px;color:${C.textFaint};text-align:center;`, { text: 'Connecting…' }));
+  return wrap;
+}
 
-  const msg = el('div', `font-size:12px;color:${C.textDim};text-align:center;`, { text: 'Scraping profile data…' });
-  const sub = el('div', `font-family:${MONO};font-size:10px;color:${C.textFaint};letter-spacing:0.3px;text-align:center;`);
-  sub.textContent = '→ fetching stats…';
-
-  // Cycle through log lines
-  const lines = ['→ fetching profile…', '→ parsing last 8 posts…', '→ computing engagement…'];
-  let i = 0;
-  const t = setInterval(() => { sub.textContent = lines[i++ % lines.length]; }, 900);
-  // Clean up interval when state changes by checking on next render
-  sub._interval = t;
-
-  wrap.appendChild(msg);
-  wrap.appendChild(sub);
+// Shown in the ready state before the user has saved anything yet
+function buildPreSaveHint() {
+  const wrap = el('div', `
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    padding:32px 24px; gap:10px; text-align:center;
+  `);
+  const icon = el('div', `
+    width:40px; height:40px; border-radius:10px;
+    background:${C.surface}; border:1px solid ${C.border};
+    display:flex; align-items:center; justify-content:center;
+    color:${C.textFaint}; margin-bottom:4px;
+  `);
+  icon.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M2 6h12M6 2v12"/></svg>`;
+  wrap.appendChild(icon);
+  wrap.appendChild(el('div', `font-size:13px;font-weight:500;color:${C.text};`, { text: 'Ready to save' }));
+  wrap.appendChild(el('div', `font-size:12px;color:${C.textFaint};line-height:1.5;max-width:200px;`, { text: 'Hit Save to Sheet to pull stats and add this creator to your Google Sheet.' }));
   return wrap;
 }
 
@@ -783,7 +797,7 @@ function buildErrorState() {
     font-family:${UI}; font-size:12px; font-weight:500; cursor:pointer;
   `, { text: 'Retry' });
   retryBtn.addEventListener('click', () => {
-    setState({ uiState: 'loading', error: null });
+    setState({ uiState: 'authenticating', error: null, data: null });
     // Signal content.js to re-init
     window.parent.postMessage({ source: 'livechrome-sidebar', type: 'RETRY' }, '*');
   });
@@ -808,7 +822,8 @@ window.addEventListener('message', (event) => {
       if (msg.page) setState({ handle: msg.page.handle, platform: msg.page.platform });
       break;
     case 'SET_STATE':
-      setState({ uiState: msg.state, error: msg.error || null });
+      // 'loading' is kept as a legacy alias for 'authenticating'
+      setState({ uiState: msg.state === 'loading' ? 'authenticating' : msg.state, error: msg.error || null });
       break;
     case 'SET_FIELDS':
       if (Array.isArray(msg.fields) && msg.fields.length > 0) {
