@@ -79,6 +79,7 @@
     const msg = event.data;
     if (!msg || msg.source !== 'livechrome-sidebar') return;
 
+    // ── Save to sheet — scraping happens HERE, only on user action ──
     if (msg.type === 'SAVE_TO_SHEET') {
       postToSidebar({ type: 'SAVE_STATE', state: 'saving' });
       (async () => {
@@ -88,8 +89,8 @@
           if (!token || !page) throw new Error('Not authenticated');
 
           // Use the user-selected sheet if set, otherwise backend uses default
-          const stored   = await new Promise(r => chrome.storage.local.get(['livechrome_active_sheet'], r));
-          const sheetId  = stored.livechrome_active_sheet?.id || null;
+          const stored  = await new Promise(r => chrome.storage.local.get(['livechrome_active_sheet'], r));
+          const sheetId = stored.livechrome_active_sheet?.id || null;
 
           const res    = await fetch(`${BACKEND_URL}/save`, {
             method: 'POST',
@@ -98,6 +99,11 @@
           });
           const result = await res.json();
           if (!res.ok) throw new Error(result.error || 'Save failed');
+
+          // After a successful save, send back the scraped stats to display in the sidebar
+          if (result.data) {
+            postToSidebar({ type: 'SET_DATA', data: result.data, handle: page.handle, platform: page.platform });
+          }
 
           postToSidebar({ type: 'SAVE_STATE', state: 'saved' });
           setTimeout(() => postToSidebar({ type: 'SAVE_STATE', state: 'idle' }), 2400);
@@ -238,11 +244,6 @@
   }
 
   // ── Field preferences ─────────────────────────────────────
-  // Always fetch fresh from the backend on each sidebar open so onboarding
-  // choices are reflected immediately without needing a browser restart.
-  // Falls back to chrome.storage cache if the network call fails,
-  // and to sensible defaults if nothing is cached at all.
-
   const DEFAULT_FIELDS = ['followers', 'engagementRate', 'avgViews', 'avgLikes', 'avgComments', 'estimatedCpm'];
 
   async function fetchAndCacheFields(token) {
@@ -253,7 +254,6 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (Array.isArray(data.fields) && data.fields.length > 0) {
-        // Cache so we have it if the next request fails
         await chrome.storage.local.set({ livechrome_fields: data.fields });
         return data.fields;
       }
@@ -267,7 +267,7 @@
     }
   }
 
-  // ── Init sidebar ──────────────────────────────────────────
+  // ── Init sidebar — NO scraping here, just auth + page detection ──
   async function initSidebar() {
     const page = detectPage();
     postToSidebar({ type: 'SET_PAGE', page });
@@ -277,7 +277,8 @@
       return;
     }
 
-    postToSidebar({ type: 'SET_STATE', state: 'loading' });
+    // Show authenticating state briefly while we check the token
+    postToSidebar({ type: 'SET_STATE', state: 'authenticating' });
 
     try {
       const token = await getToken();
@@ -286,29 +287,11 @@
         return;
       }
 
-      // Fetch the user's saved field preferences from the backend.
-      // Sent BEFORE scrape data so the sidebar knows which tiles to render.
+      // Fetch field prefs so the stat tiles know what to show after a save
       const fields = await fetchAndCacheFields(token);
       postToSidebar({ type: 'SET_FIELDS', fields });
 
-      const scrapeRes = await fetch(`${BACKEND_URL}/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          handle: page.handle,
-          platform: page.platform,
-          previewOnly: true,
-        }),
-      });
-      const scrapeData = await scrapeRes.json();
-
-      if (!scrapeRes.ok) {
-        postToSidebar({ type: 'SET_STATE', state: 'error', error: scrapeData.error || 'Scrape failed' });
-        return;
-      }
-
-      postToSidebar({ type: 'SET_DATA', data: scrapeData.data, handle: page.handle, platform: page.platform });
+      // Ready to save — no scraping yet
       postToSidebar({ type: 'SET_STATE', state: 'ready' });
 
     } catch (err) {
