@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "WePullData - Creator Intelligence",
+  "name": "WePullData \u2014 Creator Intelligence",
   "version": "2.0.0",
   "description": "Instantly surface TikTok & Instagram creator stats while browsing.",
   "permissions": [
@@ -12,7 +12,9 @@
   "oauth2": {
     "client_id": "985936531089-jedtfho14cl7b37u3n806e2ahn29jjl5.apps.googleusercontent.com",
     "scopes": [
-      "https://www.googleapis.com/auth/userinfo.email"
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/drive.readonly",
+      "https://www.googleapis.com/auth/spreadsheets"
     ]
   },
   "host_permissions": [
